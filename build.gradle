@@ -90,3 +90,10 @@ gretty {
     servletContainer = 'jetty9'
     contextPath = ''
 }
+
+// for deploying to heroku
+afterEvaluate {
+    task stage {
+        dependsOn(tasks.buildProduct)
+    }
+}
