@@ -1,0 +1,92 @@
+/*
+ * Copyright 2017 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+plugins {
+    id 'java'
+    id 'idea'
+    id 'war'
+    id 'nu.studer.jooq' version '2.0.6'
+    id "org.akhikhl.gretty" version "2.0.0"
+}
+
+repositories {
+    jcenter()
+    // temp until 0.8 is out
+    maven { url 'https://oss.sonatype.org/content/repositories/snapshots/' }
+}
+
+def jooqVersion = '3.9.5'
+def h2Version = '1.4.196'
+def miniprofilerVersion = '0.8-SNAPSHOT'
+
+dependencies {
+    compileOnly 'javax.servlet:servlet-api:2.3'
+
+    compile "com.h2database:h2:$h2Version"
+    compile "org.jooq:jooq:$jooqVersion"
+    compile "io.jdev.miniprofiler:miniprofiler-core:$miniprofilerVersion"
+    compile "io.jdev.miniprofiler:miniprofiler-jooq:$miniprofilerVersion"
+
+    jooqRuntime "com.h2database:h2:$h2Version"
+}
+
+
+// configure jooq generation
+def schemaFile = file('src/main/resources/schema.sql')
+jooq {
+    version = jooqVersion
+
+    main(sourceSets.main) {
+        jdbc {
+            driver = 'org.h2.Driver'
+            url = "jdbc:h2:mem:jooq;init=runscript from '${schemaFile.absolutePath}'"
+            user = 'sa'
+        }
+        generator {
+            name = 'org.jooq.util.DefaultGenerator'
+            strategy {
+                name = 'org.jooq.util.DefaultGeneratorStrategy'
+            }
+            database {
+                name = 'org.jooq.util.h2.H2Database'
+                inputSchema = 'PUBLIC'
+                includes = '.*'
+            }
+            generate {
+                relations = true
+                pojos = true
+            }
+            target {
+                packageName = 'io.jdev.miniprofiler.examples.jooq.db'
+                directory = 'src/generated/jooq'
+            }
+        }
+    }
+}
+
+// ensure that jooq generator runs when schema changes
+generateMainJooqSchemaSource {
+    inputs.file(schemaFile)
+}
+
+// add generated jooq files to IDEA source dir
+idea.module.generatedSourceDirs += file('src/generated/jooq')
+
+// run app using gretty plugin
+gretty {
+    servletContainer = 'jetty9'
+    contextPath = ''
+}
